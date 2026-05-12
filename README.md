@@ -1,3 +1,26 @@
+# Cloud-Enabled Smart Bus Management System
+
+> [!IMPORTANT]
+> This is a project for **ITE28 - Special Topics 1**. It is not a real or commercial application. Developed for cloud deployment.
+
+**In Partial Fulfillment of the Final Requirements for Special Topics 1**
+**ITE28 - Special Topics 1 (9479)**
+
+**By Team NEXUS:**
+* BERNALES, Raemond Kyle
+* DOMALANTA, Mark Angelo
+* DOMINGUEZ, Richard Jr.
+* FERNANDEZ, Jimrey
+* FORTES, Stephen Aldwin
+* ILAGAN, Mark Jade
+* MISAGAL, Alexander John
+* PIGURO, Dennis
+
+**Submitted to:** Mrs. Rona Domantay
+**May 2026**
+
+---
+
 # 🚌 D'Rising Sun Transport: Smart Bus Management System
 
 A cloud-enabled, full-stack MVP designed for provincial bus transport modernization. This system digitizes ticketing, fleet monitoring, and incident reporting across three specialized portals.
