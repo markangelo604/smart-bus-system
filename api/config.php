@@ -29,8 +29,17 @@ if (isset($_GET['action']) && $_GET['action'] == 'maps_key') {
     exit();
 }
 
+// Check if we should use a Unix socket (for Google Cloud Run) or a standard host
+if (strpos($db_host, '/') === 0) {
+    // DB_HOST is a path (starts with /), so use unix_socket
+    $dsn = "mysql:unix_socket=$db_host;dbname=$db_name;charset=utf8mb4";
+} else {
+    // DB_HOST is a hostname or IP, use standard host
+    $dsn = "mysql:host=$db_host;dbname=$db_name;charset=utf8mb4";
+}
+
 try {
-    $pdo = new PDO("mysql:host=$db_host;dbname=$db_name;charset=utf8mb4", $db_user, $db_pass);
+    $pdo = new PDO($dsn, $db_user, $db_pass);
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
 } catch (PDOException $e) {

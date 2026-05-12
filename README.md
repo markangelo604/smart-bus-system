@@ -55,6 +55,47 @@ A cloud-enabled, full-stack MVP designed for provincial bus transport modernizat
 
 ---
 
+## ☁️ GCP Deployment Guide
+
+### 1. Cloud SQL (MySQL) Setup
+1.  **Create Instance**: In GCP Console, go to **SQL** and click **Create Instance**. Choose **MySQL 8.0**.
+2.  **Set Password**: Set the `root` password (e.g., `nexus`).
+3.  **Authentication Fix**: To ensure compatibility with PHP, go to the **Users** tab, click the three dots next to `root`, and ensure the authentication is set to **Built-in** (Legacy MySQL 5.x/Native Password). 
+    *   *If you get an error in Cloud Shell later, run: `ALTER USER 'root'@'%' IDENTIFIED WITH mysql_native_password BY 'your_password';` in the SQL Query Editor.*
+4.  **Create Database**: Go to the **Databases** tab and create a new database named `smart_bus`.
+5.  **Import Schema**: Use the **Cloud SQL Studio** (Query Editor) in the console to paste and run the contents of `schema.sql`.
+6.  **Get Connection Name**: On the **Overview** page, copy the **Connection name** (e.g., `project-id:region:instance-id`).
+
+### 2. Cloud Run Deployment (via Cloud Shell)
+1.  **Open Cloud Shell** and clone your repository.
+2.  **Build the Image**:
+    ```bash
+    gcloud builds submit --tag gcr.io/[PROJECT_ID]/smart-bus-system
+    ```
+3.  **Deploy to Cloud Run**:
+    ```bash
+    gcloud run deploy smart-bus-system \
+      --image gcr.io/[PROJECT_ID]/smart-bus-system \
+      --platform managed \
+      --allow-unauthenticated \
+      --add-cloudsql-instances [YOUR_CONNECTION_NAME] \
+      --set-env-vars "DB_HOST=/cloudsql/[YOUR_CONNECTION_NAME],DB_NAME=smart_bus,DB_USER=root,DB_PASS=[YOUR_PASSWORD],GOOGLE_MAPS_API_KEY=[YOUR_KEY]"
+    ```
+
+### 🛠️ Environment Variables for Cloud Run
+| Variable | Value | Description |
+| :--- | :--- | :--- |
+| **`DB_HOST`** | `/cloudsql/[CONNECTION_NAME]` | The Unix socket path provided by GCP. |
+| **`DB_NAME`** | `smart_bus` | Your database name. |
+| **`DB_USER`** | `root` | Your database username. |
+| **`DB_PASS`** | `your_password` | The password you set in Cloud SQL. |
+| **`GOOGLE_MAPS_API_KEY`** | `AIza...` | Your Google Maps API Key. |
+
+> [!TIP]
+> The `/cloudsql/` prefix in the `DB_HOST` tells the application to connect via the secure Cloud SQL Auth Proxy socket rather than a traditional network host.
+
+---
+
 ## 👥 Test Credentials
 | Role | Email | Password |
 | :--- | :--- | :--- |
