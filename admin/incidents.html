@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Incidents - D'Rising Sun</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Poppins:wght@500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body>
+    <div class="layout-wrapper">
+        <aside class="sidebar">
+            <div class="sidebar-header"><i class="fas fa-bus" style="color: var(--accent)"></i> D'Rising Sun</div>
+            <nav class="sidebar-nav">
+                <a href="dashboard.html"><i class="fas fa-home"></i> Dashboard</a>
+                <a href="fleet.html"><i class="fas fa-truck-monster"></i> Fleet Management</a>
+                <a href="routes.html"><i class="fas fa-route"></i> Routes</a>
+                <a href="schedules.html"><i class="fas fa-calendar-alt"></i> Schedules</a>
+                <a href="bookings.html"><i class="fas fa-ticket-alt"></i> Bookings</a>
+                <a href="users.html"><i class="fas fa-users"></i> Users</a>
+                <a href="incidents.html" class="active"><i class="fas fa-exclamation-triangle"></i> Incidents</a>
+                <a href="reports.html"><i class="fas fa-chart-bar"></i> Reports</a>
+            </nav>
+        </aside>
+        
+        <main class="main-content">
+            <header class="top-header">
+                <h2>Incident Reports</h2>
+                <div class="user-info">
+                    <span id="user-name">Loading...</span>
+                    <button id="btn-logout" class="btn-logout"><i class="fas fa-sign-out-alt"></i> Logout</button>
+                </div>
+            </header>
+            
+            <div class="content-area">
+                <div class="table-container">
+                    <div class="table-header">
+                        <h3>Driver Reported Incidents</h3>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Date/Time</th>
+                                <th>Driver</th>
+                                <th>Route</th>
+                                <th>Description</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="incidents-table"></tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal for map viewing -->
+    <div id="incidentModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Incident Location</h3>
+                <button class="close-modal" onclick="closeModal()">&times;</button>
+            </div>
+            <div id="map"></div>
+        </div>
+    </div>
+
+    <script src="../assets/js/main.js"></script>
+    <script>
+        let incidents = [];
+        let map, marker;
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            await checkSession('admin');
+            loadIncidents();
+            loadGoogleMaps(() => {
+                map = new google.maps.Map(document.getElementById('map'), {
+                    center: { lat: 12.8797, lng: 121.7740 },
+                    zoom: 12
+                });
+                marker = new google.maps.Marker({ map: map });
+            });
+        });
+
+        async function loadIncidents() {
+            const res = await apiFetch('incidents.php');
+            if (res.success) {
+                incidents = res.data;
+                const tbody = document.getElementById('incidents-table');
+                tbody.innerHTML = '';
+                incidents.forEach(i => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${new Date(i.reported_at).toLocaleString()}</td>
+                        <td>${i.driver_name}</td>
+                        <td>${i.origin} to ${i.destination}</td>
+                        <td>${i.description}</td>
+                        <td><span class="badge ${formatStatus(i.status)}">${i.status}</span></td>
+                        <td>
+                            <button class="btn btn-info btn-sm" onclick="viewMap(${i.incident_lat}, ${i.incident_lng})">Map</button>
+                            ${i.status === 'open' ? \`<button class="btn btn-success btn-sm" onclick="resolveIncident(${i.id})">Resolve</button>\` : ''}
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+        }
+
+        function viewMap(lat, lng) {
+            if (!lat || !lng) {
+                showToast("No location data for this incident", "warning");
+                return;
+            }
+            document.getElementById('incidentModal').classList.add('active');
+            const pos = new google.maps.LatLng(lat, lng);
+            map.setCenter(pos);
+            marker.setPosition(pos);
+        }
+
+        function closeModal() {
+            document.getElementById('incidentModal').classList.remove('active');
+        }
+
+        async function resolveIncident(id) {
+            if (confirm("Mark this incident as resolved?")) {
+                const res = await apiFetch('incidents.php', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: id, status: 'resolved' })
+                });
+                if (res.success) {
+                    showToast('Incident resolved', 'success');
+                    loadIncidents();
+                }
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Routes - D'Rising Sun</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Poppins:wght@500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body>
+    <div class="layout-wrapper">
+        <aside class="sidebar">
+            <div class="sidebar-header"><i class="fas fa-bus" style="color: var(--accent)"></i> D'Rising Sun</div>
+            <nav class="sidebar-nav">
+                <a href="dashboard.html"><i class="fas fa-home"></i> Dashboard</a>
+                <a href="fleet.html"><i class="fas fa-truck-monster"></i> Fleet Management</a>
+                <a href="routes.html" class="active"><i class="fas fa-route"></i> Routes</a>
+                <a href="schedules.html"><i class="fas fa-calendar-alt"></i> Schedules</a>
+                <a href="bookings.html"><i class="fas fa-ticket-alt"></i> Bookings</a>
+                <a href="users.html"><i class="fas fa-users"></i> Users</a>
+                <a href="incidents.html"><i class="fas fa-exclamation-triangle"></i> Incidents</a>
+                <a href="reports.html"><i class="fas fa-chart-bar"></i> Reports</a>
+            </nav>
+        </aside>
+        
+        <main class="main-content">
+            <header class="top-header">
+                <h2>Route Management</h2>
+                <div class="user-info">
+                    <span id="user-name">Loading...</span>
+                    <button id="btn-logout" class="btn-logout"><i class="fas fa-sign-out-alt"></i> Logout</button>
+                </div>
+            </header>
+            
+            <div class="content-area">
+                <div class="table-container">
+                    <div class="table-header">
+                        <h3>All Routes</h3>
+                        <button class="btn btn-primary" onclick="openModal()"><i class="fas fa-plus"></i> Add Route</button>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Origin - Destination</th>
+                                <th>Stops</th>
+                                <th>Dist. (km)</th>
+                                <th>Est. Duration (min)</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="routes-table"></tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal -->
+    <div id="routeModal" class="modal">
+        <div class="modal-content" style="max-width: 800px; display: flex; gap: 20px;">
+            <div style="flex: 1;">
+                <div class="modal-header">
+                    <h3 id="modalTitle">Add Route</h3>
+                    <button class="close-modal" onclick="closeModal()">&times;</button>
+                </div>
+                <form id="routeForm">
+                    <input type="hidden" id="route_id">
+                    <div class="form-group">
+                        <label>Origin</label>
+                        <input type="text" id="origin" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Destination</label>
+                        <input type="text" id="destination" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Stops (comma separated)</label>
+                        <input type="text" id="stops" class="form-control">
+                    </div>
+                    <div style="display: flex; gap: 10px;">
+                        <div class="form-group" style="flex: 1;">
+                            <label>Distance (km)</label>
+                            <input type="number" step="0.1" id="distance_km" class="form-control" required>
+                        </div>
+                        <div class="form-group" style="flex: 1;">
+                            <label>Duration (mins)</label>
+                            <input type="number" id="estimated_duration_minutes" class="form-control" required>
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 10px;">
+                        <div class="form-group" style="flex: 1;">
+                            <label>Origin Lat/Lng</label>
+                            <input type="text" id="origin_coords" class="form-control" placeholder="e.g. 14.5995,120.9842" required>
+                        </div>
+                        <div class="form-group" style="flex: 1;">
+                            <label>Dest Lat/Lng</label>
+                            <input type="text" id="dest_coords" class="form-control" placeholder="e.g. 16.4023,120.5960" required>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Status</label>
+                        <select id="status" class="form-control">
+                            <option value="active">Active</option>
+                            <option value="inactive">Inactive</option>
+                        </select>
+                    </div>
+                    <div style="display: flex; gap: 10px; margin-top: 15px;">
+                        <button type="button" class="btn btn-accent" onclick="previewRoute()">Preview on Map</button>
+                        <button type="submit" class="btn btn-primary">Save Route</button>
+                    </div>
+                </form>
+            </div>
+            <div style="flex: 1;">
+                <div id="map" style="height: 100%; min-height: 400px; margin-top: 0;"></div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="../assets/js/main.js"></script>
+    <script>
+        let routes = [];
+        let map, directionsService, directionsRenderer;
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            await checkSession('admin');
+            loadRoutes();
+            loadGoogleMaps(initMap);
+        });
+
+        function initMap() {
+            map = new google.maps.Map(document.getElementById('map'), {
+                center: { lat: 12.8797, lng: 121.7740 }, // Philippines center
+                zoom: 6
+            });
+            directionsService = new google.maps.DirectionsService();
+            directionsRenderer = new google.maps.DirectionsRenderer();
+            directionsRenderer.setMap(map);
+        }
+
+        async function loadRoutes() {
+            const res = await apiFetch('routes.php');
+            if (res.success) {
+                routes = res.data;
+                const tbody = document.getElementById('routes-table');
+                tbody.innerHTML = '';
+                routes.forEach(route => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${route.origin} &rarr; ${route.destination}</td>
+                        <td>${route.stops || '-'}</td>
+                        <td>${route.distance_km}</td>
+                        <td>${route.estimated_duration_minutes}</td>
+                        <td><span class="badge ${formatStatus(route.status)}">${route.status}</span></td>
+                        <td>
+                            <button class="btn btn-accent btn-sm" onclick="editRoute(${route.id})">Edit</button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+        }
+
+        function openModal() {
+            document.getElementById('modalTitle').textContent = 'Add Route';
+            document.getElementById('routeForm').reset();
+            document.getElementById('route_id').value = '';
+            document.getElementById('routeModal').classList.add('active');
+            if (directionsRenderer) directionsRenderer.setDirections({routes: []});
+        }
+
+        function closeModal() {
+            document.getElementById('routeModal').classList.remove('active');
+        }
+
+        function editRoute(id) {
+            const route = routes.find(r => r.id == id);
+            if (route) {
+                document.getElementById('modalTitle').textContent = 'Edit Route';
+                document.getElementById('route_id').value = route.id;
+                document.getElementById('origin').value = route.origin;
+                document.getElementById('destination').value = route.destination;
+                document.getElementById('stops').value = route.stops;
+                document.getElementById('distance_km').value = route.distance_km;
+                document.getElementById('estimated_duration_minutes').value = route.estimated_duration_minutes;
+                document.getElementById('origin_coords').value = `${route.origin_lat},${route.origin_lng}`;
+                document.getElementById('dest_coords').value = `${route.destination_lat},${route.destination_lng}`;
+                document.getElementById('status').value = route.status;
+                document.getElementById('routeModal').classList.add('active');
+                previewRoute();
+            }
+        }
+
+        function previewRoute() {
+            const originStr = document.getElementById('origin_coords').value;
+            const destStr = document.getElementById('dest_coords').value;
+            if (!originStr || !destStr) return;
+
+            const [olat, olng] = originStr.split(',');
+            const [dlat, dlng] = destStr.split(',');
+
+            const request = {
+                origin: new google.maps.LatLng(olat, olng),
+                destination: new google.maps.LatLng(dlat, dlng),
+                travelMode: 'DRIVING'
+            };
+
+            directionsService.route(request, (result, status) => {
+                if (status == 'OK') {
+                    directionsRenderer.setDirections(result);
+                } else {
+                    showToast('Could not calculate route on map', 'error');
+                }
+            });
+        }
+
+        document.getElementById('routeForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const id = document.getElementById('route_id').value;
+            const origin_coords = document.getElementById('origin_coords').value.split(',');
+            const dest_coords = document.getElementById('dest_coords').value.split(',');
+
+            const data = {
+                origin: document.getElementById('origin').value,
+                destination: document.getElementById('destination').value,
+                stops: document.getElementById('stops').value,
+                distance_km: document.getElementById('distance_km').value,
+                estimated_duration_minutes: document.getElementById('estimated_duration_minutes').value,
+                origin_lat: origin_coords[0],
+                origin_lng: origin_coords[1],
+                destination_lat: dest_coords[0],
+                destination_lng: dest_coords[1],
+                status: document.getElementById('status').value
+            };
+
+            const method = id ? 'PUT' : 'POST';
+            if (id) data.id = id;
+
+            const res = await apiFetch('routes.php', {
+                method: method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            if (res.success) {
+                showToast(res.message, 'success');
+                closeModal();
+                loadRoutes();
+            } else {
+                showToast(res.message, 'error');
+            }
+        });
+    </script>
+</body>
+</html>

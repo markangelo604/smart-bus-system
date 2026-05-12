@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Report Incident - D'Rising Sun</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Poppins:wght@500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body>
+    <div class="layout-wrapper">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <i class="fas fa-bus" style="color: var(--accent)"></i> Driver Portal
+            </div>
+            <nav class="sidebar-nav">
+                <a href="dashboard.html"><i class="fas fa-route"></i> My Trips</a>
+                <a href="incidents.html" class="active"><i class="fas fa-exclamation-triangle"></i> Report Incident</a>
+            </nav>
+        </aside>
+        
+        <main class="main-content">
+            <header class="top-header">
+                <h2>Report an Incident</h2>
+                <div class="user-info">
+                    <span id="user-name">Loading...</span>
+                    <button id="btn-logout" class="btn-logout"><i class="fas fa-sign-out-alt"></i> Logout</button>
+                </div>
+            </header>
+            
+            <div class="content-area">
+                <div class="table-container" style="max-width: 800px;">
+                    <form id="incidentForm">
+                        <div class="form-group">
+                            <label>Select Active Trip</label>
+                            <select id="schedule_id" class="form-control" required></select>
+                        </div>
+                        <div class="form-group">
+                            <label>Description of Incident</label>
+                            <textarea id="description" class="form-control" rows="4" required></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Location (Click on map to pin)</label>
+                            <input type="hidden" id="lat" required>
+                            <input type="hidden" id="lng" required>
+                            <div id="map" style="height: 300px; width: 100%; border-radius: 4px;"></div>
+                        </div>
+                        <button type="submit" class="btn btn-danger">Submit Report</button>
+                    </form>
+                </div>
+            </div>
+        </main>
+    </div>
+    
+    <script src="../assets/js/main.js"></script>
+    <script>
+        let map, marker;
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            await checkSession('driver');
+            
+            const res = await apiFetch('schedules.php?action=list');
+            if (res.success) {
+                const select = document.getElementById('schedule_id');
+                res.data.filter(t => t.trip_status !== 'Arrived').forEach(t => {
+                    select.innerHTML += `<option value="${t.id}">${t.origin} to ${t.destination} (${new Date(t.departure_time).toLocaleDateString()})</option>`;
+                });
+            }
+
+            loadGoogleMaps(() => {
+                map = new google.maps.Map(document.getElementById('map'), {
+                    center: { lat: 14.5995, lng: 120.9842 }, // Manila
+                    zoom: 10
+                });
+                
+                // Try HTML5 geolocation
+                if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition((position) => {
+                        const pos = { lat: position.coords.latitude, lng: position.coords.longitude };
+                        map.setCenter(pos);
+                        placeMarker(pos);
+                    });
+                }
+
+                map.addListener('click', (e) => {
+                    placeMarker(e.latLng);
+                });
+            });
+        });
+
+        function placeMarker(latLng) {
+            if (marker) marker.setMap(null);
+            marker = new google.maps.Marker({
+                position: latLng,
+                map: map
+            });
+            document.getElementById('lat').value = latLng.lat() || latLng.lat;
+            document.getElementById('lng').value = latLng.lng() || latLng.lng;
+        }
+
+        document.getElementById('incidentForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            if(!document.getElementById('lat').value) {
+                showToast("Please pin the location on the map", "error");
+                return;
+            }
+
+            const data = {
+                schedule_id: document.getElementById('schedule_id').value,
+                description: document.getElementById('description').value,
+                incident_lat: document.getElementById('lat').value,
+                incident_lng: document.getElementById('lng').value
+            };
+
+            const res = await apiFetch('incidents.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            if (res.success) {
+                showToast(res.message, 'success');
+                document.getElementById('incidentForm').reset();
+                if(marker) marker.setMap(null);
+            } else {
+                showToast(res.message, 'error');
+            }
+        });
+    </script>
+</body>
+</html>

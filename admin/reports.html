@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reports - D'Rising Sun</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Poppins:wght@500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body>
+    <div class="layout-wrapper">
+        <aside class="sidebar">
+            <div class="sidebar-header"><i class="fas fa-bus" style="color: var(--accent)"></i> D'Rising Sun</div>
+            <nav class="sidebar-nav">
+                <a href="dashboard.html"><i class="fas fa-home"></i> Dashboard</a>
+                <a href="fleet.html"><i class="fas fa-truck-monster"></i> Fleet Management</a>
+                <a href="routes.html"><i class="fas fa-route"></i> Routes</a>
+                <a href="schedules.html"><i class="fas fa-calendar-alt"></i> Schedules</a>
+                <a href="bookings.html"><i class="fas fa-ticket-alt"></i> Bookings</a>
+                <a href="users.html"><i class="fas fa-users"></i> Users</a>
+                <a href="incidents.html"><i class="fas fa-exclamation-triangle"></i> Incidents</a>
+                <a href="reports.html" class="active"><i class="fas fa-chart-bar"></i> Reports</a>
+            </nav>
+        </aside>
+        
+        <main class="main-content">
+            <header class="top-header">
+                <h2>Reports</h2>
+                <div class="user-info">
+                    <span id="user-name">Loading...</span>
+                    <button id="btn-logout" class="btn-logout"><i class="fas fa-sign-out-alt"></i> Logout</button>
+                </div>
+            </header>
+            
+            <div class="content-area">
+                <div class="table-container">
+                    <div class="table-header">
+                        <h3>Daily Booking Summary (Last 30 Days)</h3>
+                        <button class="btn btn-primary" onclick="window.print()"><i class="fas fa-print"></i> Print</button>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Total Bookings</th>
+                                <th>Total Revenue</th>
+                            </tr>
+                        </thead>
+                        <tbody id="reports-table"></tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="../assets/js/main.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            await checkSession('admin');
+            loadReports();
+        });
+
+        async function loadReports() {
+            const res = await apiFetch('reports.php?action=summary');
+            if (res.success) {
+                const tbody = document.getElementById('reports-table');
+                tbody.innerHTML = '';
+                res.data.forEach(r => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${new Date(r.date).toLocaleDateString()}</td>
+                        <td>${r.total_bookings}</td>
+                        <td>₱${parseFloat(r.total_revenue).toLocaleString()}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+        }
+    </script>
+</body>
+</html>

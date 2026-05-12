@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Bookings - D'Rising Sun</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Poppins:wght@500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body>
+    <header class="navbar">
+        <div class="sidebar-header"><i class="fas fa-bus" style="color: var(--accent)"></i> D'Rising Sun</div>
+        <div class="nav-links">
+            <a href="dashboard.html">Find Trips</a>
+            <a href="bookings.html" class="active">My Bookings</a>
+            <span id="user-name" style="margin-left: 20px; font-weight: 500;"></span>
+            <a href="#" id="btn-logout"><i class="fas fa-sign-out-alt"></i></a>
+        </div>
+    </header>
+
+    <main class="content-area">
+        <div class="table-container">
+            <h3>Booking History</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Booking ID</th>
+                        <th>Route</th>
+                        <th>Departure</th>
+                        <th>Seat</th>
+                        <th>Trip Status</th>
+                        <th>Booking Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="bookings-table"></tbody>
+            </table>
+        </div>
+        
+        <div id="map-container" style="display:none; margin-top:20px;">
+            <div class="table-container">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                    <h3>Live Trip Status</h3>
+                    <button class="btn btn-sm btn-danger" onclick="document.getElementById('map-container').style.display='none'">Close Map</button>
+                </div>
+                <div id="map" style="height: 400px; width: 100%;"></div>
+            </div>
+        </div>
+    </main>
+
+    <script src="../assets/js/main.js"></script>
+    <script>
+        let bookings = [];
+        let map, directionsService, directionsRenderer, marker;
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            await checkSession('passenger');
+            loadBookings();
+            loadGoogleMaps(() => {
+                map = new google.maps.Map(document.getElementById('map'), {
+                    center: { lat: 12.8797, lng: 121.7740 },
+                    zoom: 6
+                });
+                directionsService = new google.maps.DirectionsService();
+                directionsRenderer = new google.maps.DirectionsRenderer();
+                directionsRenderer.setMap(map);
+                marker = new google.maps.Marker({ map: map, icon: {
+                    url: 'https://maps.google.com/mapfiles/kml/shapes/bus.png',
+                    scaledSize: new google.maps.Size(32, 32)
+                }});
+            });
+        });
+
+        async function loadBookings() {
+            const res = await apiFetch('bookings.php?action=list');
+            console.log("Bookings API Response:", res);
+            if (res.success) {
+                bookings = res.data;
+                const tbody = document.getElementById('bookings-table');
+                tbody.innerHTML = '';
+                
+                if (bookings.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;">You have no bookings yet. Go to Find Trips to book a ride!</td></tr>';
+                    return;
+                }
+
+                bookings.forEach(b => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>#${b.id}</td>
+                        <td>${b.origin} to ${b.destination}</td>
+                        <td>${new Date(b.departure_time).toLocaleString()}</td>
+                        <td>${b.seat_number}</td>
+                        <td><span class="badge ${formatStatus(b.trip_status)}">${b.trip_status}</span></td>
+                        <td><span class="badge ${formatStatus(b.status)}">${b.status}</span></td>
+                        <td>
+                            <button class="btn btn-info btn-sm" onclick="viewTripMap(${b.id})">Track Bus</button>
+                            ${b.status === 'confirmed' ? `<button class="btn btn-danger btn-sm" onclick="cancelBooking(${b.id})">Cancel</button>` : ''}
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+        }
+
+        async function cancelBooking(id) {
+            if (confirm("Are you sure you want to cancel this booking?")) {
+                const res = await apiFetch('bookings.php', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: id, status: 'cancelled' })
+                });
+                if (res.success) {
+                    showToast('Booking cancelled', 'success');
+                    loadBookings();
+                }
+            }
+        }
+
+        function viewTripMap(id) {
+            const b = bookings.find(x => x.id == id);
+            if (!b) return;
+
+            document.getElementById('map-container').style.display = 'block';
+            
+            directionsService.route({
+                origin: b.origin + ", Philippines",
+                destination: b.destination + ", Philippines",
+                travelMode: 'DRIVING'
+            }, (result, status) => {
+                if (status == 'OK') {
+                    directionsRenderer.setDirections(result);
+                    marker.setPosition(result.routes[0].legs[0].start_location);
+                    const infoWindow = new google.maps.InfoWindow({
+                        content: `<div><strong>Bus Status:</strong> ${b.trip_status}</div>`
+                    });
+                    infoWindow.open(map, marker);
+                    window.scrollTo(0, document.body.scrollHeight);
+                }
+            });
+        }
+    </script>
+</body>
+</html>

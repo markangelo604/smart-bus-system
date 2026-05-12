@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Book a Trip - D'Rising Sun</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Poppins:wght@500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body>
+    <header class="navbar">
+        <div class="sidebar-header"><i class="fas fa-bus" style="color: var(--accent)"></i> D'Rising Sun</div>
+        <div class="nav-links">
+            <a href="dashboard.html" class="active">Find Trips</a>
+            <a href="bookings.html">My Bookings</a>
+            <span id="user-name" style="margin-left: 20px; font-weight: 500;"></span>
+            <a href="#" id="btn-logout"><i class="fas fa-sign-out-alt"></i></a>
+        </div>
+    </header>
+
+    <main class="content-area">
+        <div class="table-container" style="margin-bottom: 30px;">
+            <h3>Find Your Trip</h3>
+            <form id="searchForm" style="display: flex; gap: 10px; flex-wrap: wrap;">
+                <div class="form-group" style="flex: 1; min-width: 200px;">
+                    <label>Origin</label>
+                    <select id="origin" class="form-control">
+                        <option value="">Any Origin</option>
+                        <option value="Manila">Manila</option>
+                    </select>
+                </div>
+                <div class="form-group" style="flex: 1; min-width: 200px;">
+                    <label>Destination</label>
+                    <select id="destination" class="form-control">
+                        <option value="">Any Destination</option>
+                        <option value="Baguio">Baguio</option>
+                        <option value="Batangas City">Batangas City</option>
+                        <option value="Lucena City">Lucena City</option>
+                    </select>
+                </div>
+                <div class="form-group" style="flex: 1; min-width: 200px;">
+                    <label>Date</label>
+                    <input type="date" id="date" class="form-control" required>
+                </div>
+                <div class="form-group" style="display: flex; align-items: flex-end;">
+                    <button type="submit" class="btn btn-primary">Search</button>
+                </div>
+            </form>
+        </div>
+
+        <div id="results-container" style="display: none;">
+            <div class="table-container">
+                <h3>Available Schedules</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Route</th>
+                            <th>Departure</th>
+                            <th>Bus Type</th>
+                            <th>Fare</th>
+                            <th>Seats</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="results-table"></tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <!-- Booking Modal -->
+    <div id="bookingModal" class="modal">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">
+                <h3>Select Your Seat</h3>
+                <button class="close-modal" onclick="closeModal()">&times;</button>
+            </div>
+            <div id="trip-details" style="margin-bottom: 20px; font-size: 0.9rem; color: #666;"></div>
+            <div class="seat-grid" id="seat-grid"></div>
+            <div id="booking-summary" style="margin-top: 20px; display: none;">
+                <p>Selected Seat: <strong id="selected-seat-no">-</strong></p>
+                <p>Total Fare: <strong id="total-fare">₱0</strong></p>
+                <button class="btn btn-primary" style="width: 100%; margin-top: 10px;" onclick="confirmBooking()">Confirm Booking</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="../assets/js/main.js"></script>
+    <script>
+        let selectedScheduleId = null;
+        let selectedSeat = null;
+        let currentSchedules = [];
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            await checkSession('passenger');
+            // Set default date to tomorrow
+            const tomorrow = new Date();
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            document.getElementById('date').value = tomorrow.toISOString().split('T')[0];
+        });
+
+        document.getElementById('searchForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const origin = document.getElementById('origin').value;
+            const destination = document.getElementById('destination').value;
+            const date = document.getElementById('date').value;
+
+            const res = await apiFetch(`schedules.php?action=search&origin=${origin}&destination=${destination}&date=${date}`);
+            if (res.success) {
+                currentSchedules = res.data;
+                const tbody = document.getElementById('results-table');
+                tbody.innerHTML = '';
+                if (res.data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">No schedules found for this date.</td></tr>';
+                } else {
+                    res.data.forEach(s => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td>${s.origin} to ${s.destination}</td>
+                            <td>${new Date(s.departure_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</td>
+                            <td>${s.bus_type}</td>
+                            <td>₱${parseFloat(s.fare).toLocaleString()}</td>
+                            <td>${s.available_seats} left</td>
+                            <td><button class="btn btn-accent btn-sm" onclick="openBookingModal(${s.id})">Book Now</button></td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                }
+                document.getElementById('results-container').style.display = 'block';
+            }
+        });
+
+        async function openBookingModal(id) {
+            selectedScheduleId = id;
+            selectedSeat = null;
+            const s = currentSchedules.find(x => x.id == id);
+            
+            document.getElementById('trip-details').innerHTML = `
+                <p><strong>Route:</strong> ${s.origin} to ${s.destination}</p>
+                <p><strong>Time:</strong> ${new Date(s.departure_time).toLocaleString()}</p>
+            `;
+            document.getElementById('total-fare').textContent = `₱${parseFloat(s.fare).toLocaleString()}`;
+            document.getElementById('booking-summary').style.display = 'none';
+
+            // Load taken seats
+            const res = await apiFetch(`bookings.php?action=seats&schedule_id=${id}`);
+            if (res.success) {
+                const takenSeats = res.data.map(Number);
+                const grid = document.getElementById('seat-grid');
+                grid.innerHTML = '';
+                
+                const capacity = 45; 
+                for (let i = 1; i <= capacity; i++) {
+                    const seat = document.createElement('div');
+                    seat.className = `seat ${takenSeats.includes(i) ? 'taken' : 'available'}`;
+                    seat.textContent = i;
+                    if (!takenSeats.includes(i)) {
+                        seat.onclick = () => selectSeat(i, seat);
+                    }
+                    grid.appendChild(seat);
+                }
+                document.getElementById('bookingModal').classList.add('active');
+            }
+        }
+
+        function selectSeat(num, el) {
+            document.querySelectorAll('.seat.selected').forEach(s => s.classList.remove('selected'));
+            el.classList.add('selected');
+            selectedSeat = num;
+            document.getElementById('selected-seat-no').textContent = num;
+            document.getElementById('booking-summary').style.display = 'block';
+        }
+
+        function closeModal() {
+            document.getElementById('bookingModal').classList.remove('active');
+        }
+
+        async function confirmBooking() {
+            if (!selectedSeat) return;
+
+            const res = await apiFetch('bookings.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    schedule_id: selectedScheduleId,
+                    seat_number: selectedSeat
+                })
+            });
+
+            if (res.success) {
+                showToast(res.message, 'success');
+                closeModal();
+                // Refresh search
+                document.getElementById('searchForm').dispatchEvent(new Event('submit'));
+            } else {
+                showToast(res.message, 'error');
+            }
+        }
+    </script>
+</body>
+</html>

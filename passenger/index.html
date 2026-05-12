@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Passenger Login - D'Rising Sun</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Poppins:wght@500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body>
+    <div class="auth-container">
+        <div class="auth-card">
+            <div class="auth-logo">
+                <i class="fas fa-bus"></i>
+                <h2>Passenger Portal</h2>
+            </div>
+            <div id="login-view">
+                <form id="loginForm">
+                    <div class="form-group">
+                        <input type="email" id="email" class="form-control" placeholder="Email" required value="pass1@example.com">
+                    </div>
+                    <div class="form-group">
+                        <input type="password" id="password" class="form-control" placeholder="Password" required value="password">
+                    </div>
+                    <button type="submit" class="btn btn-primary" style="width: 100%">Login</button>
+                </form>
+                <p style="margin-top: 20px;">Don't have an account? <a href="#" onclick="toggleAuth(false)">Register here</a></p>
+            </div>
+            <div id="register-view" style="display: none;">
+                <form id="registerForm">
+                    <div class="form-group">
+                        <input type="text" id="reg_name" class="form-control" placeholder="Full Name" required>
+                    </div>
+                    <div class="form-group">
+                        <input type="email" id="reg_email" class="form-control" placeholder="Email" required>
+                    </div>
+                    <div class="form-group">
+                        <input type="password" id="reg_password" class="form-control" placeholder="Password" required>
+                    </div>
+                    <div class="form-group">
+                        <input type="text" id="reg_phone" class="form-control" placeholder="Phone Number">
+                    </div>
+                    <button type="submit" class="btn btn-primary" style="width: 100%">Register</button>
+                </form>
+                <p style="margin-top: 20px;">Already have an account? <a href="#" onclick="toggleAuth(true)">Login here</a></p>
+            </div>
+        </div>
+    </div>
+    <script src="../assets/js/main.js"></script>
+    <script>
+        function toggleAuth(isLogin) {
+            document.getElementById('login-view').style.display = isLogin ? 'block' : 'none';
+            document.getElementById('register-view').style.display = isLogin ? 'none' : 'block';
+        }
+
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            const res = await apiFetch('auth.php?action=login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password })
+            });
+            
+            if (res.success && res.data.role === 'passenger') {
+                window.location.href = 'dashboard.html';
+            } else {
+                showToast(res.message || 'Invalid credentials', 'error');
+            }
+        });
+
+        document.getElementById('registerForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const data = {
+                full_name: document.getElementById('reg_name').value,
+                email: document.getElementById('reg_email').value,
+                password: document.getElementById('reg_password').value,
+                phone: document.getElementById('reg_phone').value
+            };
+            
+            const res = await apiFetch('auth.php?action=register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            
+            if (res.success) {
+                showToast(res.message, 'success');
+                toggleAuth(true);
+            } else {
+                showToast(res.message, 'error');
+            }
+        });
+    </script>
+</body>
+</html>

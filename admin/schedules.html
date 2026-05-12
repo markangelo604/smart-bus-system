@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Schedules - D'Rising Sun</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Poppins:wght@500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body>
+    <div class="layout-wrapper">
+        <aside class="sidebar">
+            <div class="sidebar-header"><i class="fas fa-bus" style="color: var(--accent)"></i> D'Rising Sun</div>
+            <nav class="sidebar-nav">
+                <a href="dashboard.html"><i class="fas fa-home"></i> Dashboard</a>
+                <a href="fleet.html"><i class="fas fa-truck-monster"></i> Fleet Management</a>
+                <a href="routes.html"><i class="fas fa-route"></i> Routes</a>
+                <a href="schedules.html" class="active"><i class="fas fa-calendar-alt"></i> Schedules</a>
+                <a href="bookings.html"><i class="fas fa-ticket-alt"></i> Bookings</a>
+                <a href="users.html"><i class="fas fa-users"></i> Users</a>
+                <a href="incidents.html"><i class="fas fa-exclamation-triangle"></i> Incidents</a>
+                <a href="reports.html"><i class="fas fa-chart-bar"></i> Reports</a>
+            </nav>
+        </aside>
+        
+        <main class="main-content">
+            <header class="top-header">
+                <h2>Schedules</h2>
+                <div class="user-info">
+                    <span id="user-name">Loading...</span>
+                    <button id="btn-logout" class="btn-logout"><i class="fas fa-sign-out-alt"></i> Logout</button>
+                </div>
+            </header>
+            
+            <div class="content-area">
+                <div class="table-container">
+                    <div class="table-header">
+                        <h3>Trip Schedules</h3>
+                        <button class="btn btn-primary" onclick="openModal()"><i class="fas fa-plus"></i> Add Schedule</button>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Route</th>
+                                <th>Bus</th>
+                                <th>Driver</th>
+                                <th>Departure Time</th>
+                                <th>Seats</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="schedules-table"></tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal -->
+    <div id="scheduleModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modalTitle">Add Schedule</h3>
+                <button class="close-modal" onclick="closeModal()">&times;</button>
+            </div>
+            <form id="scheduleForm">
+                <input type="hidden" id="schedule_id">
+                <div class="form-group">
+                    <label>Route</label>
+                    <select id="route_id" class="form-control" required></select>
+                </div>
+                <div class="form-group">
+                    <label>Bus</label>
+                    <select id="bus_id" class="form-control" required></select>
+                </div>
+                <div class="form-group">
+                    <label>Driver</label>
+                    <select id="driver_id" class="form-control" required></select>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <div class="form-group" style="flex: 1;">
+                        <label>Departure Time</label>
+                        <input type="datetime-local" id="departure_time" class="form-control" required>
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label>Arrival Time</label>
+                        <input type="datetime-local" id="arrival_time" class="form-control" required>
+                    </div>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <div class="form-group" style="flex: 1;">
+                        <label>Fare</label>
+                        <input type="number" step="0.01" id="fare" class="form-control" required>
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label>Available Seats</label>
+                        <input type="number" id="available_seats" class="form-control" required>
+                    </div>
+                </div>
+                <div class="form-group" id="statusGroup" style="display:none;">
+                    <label>Trip Status</label>
+                    <select id="trip_status" class="form-control">
+                        <option value="Scheduled">Scheduled</option>
+                        <option value="Boarding">Boarding</option>
+                        <option value="Departed">Departed</option>
+                        <option value="En Route">En Route</option>
+                        <option value="Arrived">Arrived</option>
+                        <option value="Cancelled">Cancelled</option>
+                        <option value="Delayed">Delayed</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary">Save Schedule</button>
+            </form>
+        </div>
+    </div>
+    
+    <script src="../assets/js/main.js"></script>
+    <script>
+        let schedules = [];
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            await checkSession('admin');
+            loadSchedules();
+            loadDropdowns();
+        });
+
+        async function loadSchedules() {
+            const res = await apiFetch('schedules.php?action=list');
+            if (res.success) {
+                schedules = res.data;
+                const tbody = document.getElementById('schedules-table');
+                tbody.innerHTML = '';
+                schedules.forEach(s => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${s.origin} to ${s.destination}</td>
+                        <td>${s.bus_number}</td>
+                        <td>${s.driver_name}</td>
+                        <td>${new Date(s.departure_time).toLocaleString()}</td>
+                        <td>${s.available_seats}</td>
+                        <td><span class="badge ${formatStatus(s.trip_status)}">${s.trip_status}</span></td>
+                        <td>
+                            <button class="btn btn-accent btn-sm" onclick="editSchedule(${s.id})">Edit</button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+        }
+
+        async function loadDropdowns() {
+            const [routesRes, busesRes, usersRes] = await Promise.all([
+                apiFetch('routes.php'),
+                apiFetch('buses.php'),
+                apiFetch('users.php?role=driver')
+            ]);
+            
+            if (routesRes.success) {
+                document.getElementById('route_id').innerHTML = routesRes.data.map(r => `<option value="${r.id}">${r.origin} to ${r.destination}</option>`).join('');
+            }
+            if (busesRes.success) {
+                document.getElementById('bus_id').innerHTML = busesRes.data.map(b => `<option value="${b.id}">${b.bus_number} (${b.capacity} pax)</option>`).join('');
+                document.getElementById('bus_id').addEventListener('change', (e) => {
+                    const bus = busesRes.data.find(b => b.id == e.target.value);
+                    if(bus) document.getElementById('available_seats').value = bus.capacity;
+                });
+            }
+            if (usersRes.success) {
+                document.getElementById('driver_id').innerHTML = usersRes.data.map(u => `<option value="${u.id}">${u.full_name}</option>`).join('');
+            }
+        }
+
+        function openModal() {
+            document.getElementById('modalTitle').textContent = 'Add Schedule';
+            document.getElementById('scheduleForm').reset();
+            document.getElementById('schedule_id').value = '';
+            document.getElementById('statusGroup').style.display = 'none';
+            document.getElementById('scheduleModal').classList.add('active');
+        }
+
+        function closeModal() {
+            document.getElementById('scheduleModal').classList.remove('active');
+        }
+
+        function editSchedule(id) {
+            const s = schedules.find(x => x.id == id);
+            if (s) {
+                document.getElementById('modalTitle').textContent = 'Edit Schedule';
+                document.getElementById('schedule_id').value = s.id;
+                document.getElementById('route_id').value = s.route_id;
+                document.getElementById('bus_id').value = s.bus_id;
+                document.getElementById('driver_id').value = s.driver_id;
+                document.getElementById('departure_time').value = s.departure_time.slice(0,16);
+                document.getElementById('arrival_time').value = s.arrival_time.slice(0,16);
+                document.getElementById('fare').value = s.fare;
+                document.getElementById('available_seats').value = s.available_seats;
+                document.getElementById('trip_status').value = s.trip_status;
+                document.getElementById('statusGroup').style.display = 'block';
+                document.getElementById('scheduleModal').classList.add('active');
+            }
+        }
+
+        document.getElementById('scheduleForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const id = document.getElementById('schedule_id').value;
+            const data = {
+                route_id: document.getElementById('route_id').value,
+                bus_id: document.getElementById('bus_id').value,
+                driver_id: document.getElementById('driver_id').value,
+                departure_time: document.getElementById('departure_time').value,
+                arrival_time: document.getElementById('arrival_time').value,
+                fare: document.getElementById('fare').value,
+                available_seats: document.getElementById('available_seats').value
+            };
+
+            const method = id ? 'PUT' : 'POST';
+            if (id) {
+                data.id = id;
+                data.trip_status = document.getElementById('trip_status').value;
+            }
+
+            const res = await apiFetch('schedules.php', {
+                method: method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            if (res.success) {
+                showToast(res.message, 'success');
+                closeModal();
+                loadSchedules();
+            } else {
+                showToast(res.message, 'error');
+            }
+        });
+    </script>
+</body>
+</html>

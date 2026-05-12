@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Driver Dashboard - D'Rising Sun</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Poppins:wght@500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body>
+    <div class="layout-wrapper">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <i class="fas fa-bus" style="color: var(--accent)"></i> Driver Portal
+            </div>
+            <nav class="sidebar-nav">
+                <a href="dashboard.html" class="active"><i class="fas fa-route"></i> My Trips</a>
+                <a href="incidents.html"><i class="fas fa-exclamation-triangle"></i> Report Incident</a>
+            </nav>
+        </aside>
+        
+        <main class="main-content">
+            <header class="top-header">
+                <h2>My Assigned Trips</h2>
+                <div class="user-info">
+                    <span id="user-name">Loading...</span>
+                    <button id="btn-logout" class="btn-logout"><i class="fas fa-sign-out-alt"></i> Logout</button>
+                </div>
+            </header>
+            
+            <div class="content-area">
+                <div class="table-container">
+                    <div class="table-header">
+                        <h3>Upcoming & Active Trips</h3>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Route</th>
+                                <th>Bus</th>
+                                <th>Departure Time</th>
+                                <th>Current Status</th>
+                                <th>Update Status</th>
+                                <th>Map</th>
+                            </tr>
+                        </thead>
+                        <tbody id="trips-table"></tbody>
+                    </table>
+                </div>
+                
+                <div id="map-container" style="display:none; margin-top:20px;">
+                    <div class="table-container">
+                        <h3>Route Map</h3>
+                        <div id="map" style="height: 400px; width: 100%;"></div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+    
+    <script src="../assets/js/main.js"></script>
+    <script>
+        let trips = [];
+        let map, directionsService, directionsRenderer;
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            await checkSession('driver');
+            loadTrips();
+            loadGoogleMaps(() => {
+                map = new google.maps.Map(document.getElementById('map'), {
+                    center: { lat: 12.8797, lng: 121.7740 },
+                    zoom: 6
+                });
+                directionsService = new google.maps.DirectionsService();
+                directionsRenderer = new google.maps.DirectionsRenderer();
+                directionsRenderer.setMap(map);
+            });
+        });
+
+        async function loadTrips() {
+            const res = await apiFetch('schedules.php?action=list');
+            if (res.success) {
+                trips = res.data.filter(t => t.trip_status !== 'Arrived' && t.trip_status !== 'Cancelled');
+                const tbody = document.getElementById('trips-table');
+                tbody.innerHTML = '';
+                trips.forEach(t => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${t.origin} to ${t.destination}</td>
+                        <td>${t.bus_number}</td>
+                        <td>${new Date(t.departure_time).toLocaleString()}</td>
+                        <td><span class="badge ${formatStatus(t.trip_status)}">${t.trip_status}</span></td>
+                        <td>
+                            <select class="form-control" style="width:auto; display:inline-block;" onchange="updateStatus(${t.id}, this.value)">
+                                <option value="" disabled selected>Change...</option>
+                                <option value="Boarding">Boarding</option>
+                                <option value="Departed">Departed</option>
+                                <option value="En Route">En Route</option>
+                                <option value="Delayed">Delayed</option>
+                                <option value="Arrived">Arrived</option>
+                            </select>
+                        </td>
+                        <td><button class="btn btn-info btn-sm" onclick="viewRouteMap(${t.id})">View Map</button></td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+        }
+
+        async function updateStatus(id, status) {
+            const res = await apiFetch('schedules.php', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id, trip_status: status })
+            });
+            if (res.success) {
+                showToast('Status updated', 'success');
+                loadTrips();
+            } else {
+                showToast(res.message, 'error');
+            }
+        }
+        
+        async function viewRouteMap(id) {
+            const trip = trips.find(t => t.id == id);
+            if(!trip) return;
+            
+            document.getElementById('map-container').style.display = 'block';
+            
+            const request = {
+                origin: new google.maps.LatLng(trip.origin_lat || 14.5995, trip.origin_lng || 120.9842),
+                destination: new google.maps.LatLng(trip.destination_lat || 16.4023, trip.destination_lng || 120.5960),
+                travelMode: 'DRIVING'
+            };
+
+            // Using geocoder for fallback if lat/lng are missing
+            directionsService.route({
+                origin: trip.origin + ", Philippines",
+                destination: trip.destination + ", Philippines",
+                travelMode: 'DRIVING'
+            }, (result, status) => {
+                if (status == 'OK') {
+                    directionsRenderer.setDirections(result);
+                    window.scrollTo(0, document.body.scrollHeight);
+                } else {
+                    showToast('Map route calculation failed', 'error');
+                }
+            });
+        }
+    </script>
+</body>
+</html>

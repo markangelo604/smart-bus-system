@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fleet Management - D'Rising Sun</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Poppins:wght@500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body>
+    <div class="layout-wrapper">
+        <aside class="sidebar">
+            <div class="sidebar-header"><i class="fas fa-bus" style="color: var(--accent)"></i> D'Rising Sun</div>
+            <nav class="sidebar-nav">
+                <a href="dashboard.html"><i class="fas fa-home"></i> Dashboard</a>
+                <a href="fleet.html" class="active"><i class="fas fa-truck-monster"></i> Fleet Management</a>
+                <a href="routes.html"><i class="fas fa-route"></i> Routes</a>
+                <a href="schedules.html"><i class="fas fa-calendar-alt"></i> Schedules</a>
+                <a href="bookings.html"><i class="fas fa-ticket-alt"></i> Bookings</a>
+                <a href="users.html"><i class="fas fa-users"></i> Users</a>
+                <a href="incidents.html"><i class="fas fa-exclamation-triangle"></i> Incidents</a>
+                <a href="reports.html"><i class="fas fa-chart-bar"></i> Reports</a>
+            </nav>
+        </aside>
+        
+        <main class="main-content">
+            <header class="top-header">
+                <h2>Fleet Management</h2>
+                <div class="user-info">
+                    <span id="user-name">Loading...</span>
+                    <button id="btn-logout" class="btn-logout"><i class="fas fa-sign-out-alt"></i> Logout</button>
+                </div>
+            </header>
+            
+            <div class="content-area">
+                <div class="table-container">
+                    <div class="table-header">
+                        <h3>All Buses</h3>
+                        <button class="btn btn-primary" onclick="openModal()"><i class="fas fa-plus"></i> Add Bus</button>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Bus Number</th>
+                                <th>Plate Number</th>
+                                <th>Capacity</th>
+                                <th>Type</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="buses-table">
+                            <!-- Populated via JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal -->
+    <div id="busModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modalTitle">Add Bus</h3>
+                <button class="close-modal" onclick="closeModal()">&times;</button>
+            </div>
+            <form id="busForm">
+                <input type="hidden" id="bus_id">
+                <div class="form-group">
+                    <label>Bus Number</label>
+                    <input type="text" id="bus_number" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label>Plate Number</label>
+                    <input type="text" id="plate_number" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label>Capacity</label>
+                    <input type="number" id="capacity" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label>Type</label>
+                    <select id="type" class="form-control" required>
+                        <option value="Ordinary">Ordinary</option>
+                        <option value="Air-conditioned">Air-conditioned</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Status</label>
+                    <select id="status" class="form-control" required>
+                        <option value="active">Active</option>
+                        <option value="maintenance">Maintenance</option>
+                        <option value="inactive">Inactive</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary">Save Bus</button>
+            </form>
+        </div>
+    </div>
+    
+    <script src="../assets/js/main.js"></script>
+    <script>
+        let buses = [];
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            await checkSession('admin');
+            loadBuses();
+        });
+
+        async function loadBuses() {
+            const res = await apiFetch('buses.php');
+            if (res.success) {
+                buses = res.data;
+                const tbody = document.getElementById('buses-table');
+                tbody.innerHTML = '';
+                buses.forEach(bus => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${bus.bus_number}</td>
+                        <td>${bus.plate_number}</td>
+                        <td>${bus.capacity}</td>
+                        <td>${bus.type}</td>
+                        <td><span class="badge ${formatStatus(bus.status)}">${bus.status}</span></td>
+                        <td>
+                            <button class="btn btn-accent btn-sm" onclick="editBus(${bus.id})">Edit</button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+        }
+
+        function openModal() {
+            document.getElementById('modalTitle').textContent = 'Add Bus';
+            document.getElementById('busForm').reset();
+            document.getElementById('bus_id').value = '';
+            document.getElementById('busModal').classList.add('active');
+        }
+
+        function closeModal() {
+            document.getElementById('busModal').classList.remove('active');
+        }
+
+        function editBus(id) {
+            const bus = buses.find(b => b.id == id);
+            if (bus) {
+                document.getElementById('modalTitle').textContent = 'Edit Bus';
+                document.getElementById('bus_id').value = bus.id;
+                document.getElementById('bus_number').value = bus.bus_number;
+                document.getElementById('plate_number').value = bus.plate_number;
+                document.getElementById('capacity').value = bus.capacity;
+                document.getElementById('type').value = bus.type;
+                document.getElementById('status').value = bus.status;
+                document.getElementById('busModal').classList.add('active');
+            }
+        }
+
+        document.getElementById('busForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const id = document.getElementById('bus_id').value;
+            const data = {
+                bus_number: document.getElementById('bus_number').value,
+                plate_number: document.getElementById('plate_number').value,
+                capacity: document.getElementById('capacity').value,
+                type: document.getElementById('type').value,
+                status: document.getElementById('status').value
+            };
+
+            const method = id ? 'PUT' : 'POST';
+            if (id) data.id = id;
+
+            const res = await apiFetch('buses.php', {
+                method: method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            if (res.success) {
+                showToast(res.message, 'success');
+                closeModal();
+                loadBuses();
+            } else {
+                showToast(res.message, 'error');
+            }
+        });
+    </script>
+</body>
+</html>
